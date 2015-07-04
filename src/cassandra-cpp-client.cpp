@@ -7,7 +7,7 @@
 //============================================================================
 
 #include <iostream>
-#include "CassandraConnector.cpp"
+#include "CassandraConnector.hpp"
 #include /*Select*/"KeyspacesQuery.cpp"
 #include "Basic.hpp"
 #include "SchemaMeta.hpp"
@@ -15,15 +15,26 @@ using namespace std;
 
 int main()
 {
+
+// 1
+/*
 	CassandraConnector connector;
 	connector.connect();
 	CassSession* session = connector.get_session();
-	/*Select*/KeySpacesQuery ksq(session);
+	KeySpacesQuery ksq(session);
 	ksq.query();
 	connector.disconnect();
+*/
 
-	Basic::instance().run();
-	SchemaMeta::instance().run();
+// 2
+/*
+	Basic b;
+	b.run();
+*/
+
+// 3
+	SchemaMeta sm;
+	sm.run();
 
 	return 0;
 }
