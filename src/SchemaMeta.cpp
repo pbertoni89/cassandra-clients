@@ -34,8 +34,6 @@ void SchemaMeta::print_table(const char* keyspace, const char* table)
 
 void SchemaMeta::_run()
 {
-	CassFuture* close_future = NULL;
-
 	//drop_keyspace_if_not_exists();
 
 	execute_query("CREATE KEYSPACE examples WITH replication = { \
