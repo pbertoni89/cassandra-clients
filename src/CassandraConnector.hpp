@@ -2,6 +2,7 @@
 #define CASSANDRA_CONNECTOR_HPP
 #include <cassandra.h>
 #include <stdio.h>
+#include <iostream>
 
 class CassandraConnector
 {

@@ -32,6 +32,11 @@ int CassandraConnector::run()
 	return 0;
 }
 
+void CassandraConnector::_run()
+{
+	std::cout << "OVERRIDE ME !" << std::endl;
+}
+
 bool CassandraConnector::connect()
 {
 	bool is_connected = true;

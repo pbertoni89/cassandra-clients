@@ -6,7 +6,6 @@
 // Description : Hello World in C++, Ansi-style
 //============================================================================
 
-#include <iostream>
 #include "CassandraConnector.hpp"
 #include /*Select*/"KeyspacesQuery.cpp"
 #include "Basic.hpp"
