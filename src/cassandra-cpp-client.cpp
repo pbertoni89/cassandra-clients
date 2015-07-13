@@ -17,12 +17,15 @@ using namespace std;
 int main(int argc, char* argv[])
 {
 	int option_char;
-	int d_flag = 0, e_flag = 0, b_flag = 0, s_flag = 0;
+	int g_flag = 0, d_flag = 0, e_flag = 0, b_flag = 0, l_flag = 0, s_flag = 0;
 
-	while ((option_char = getopt(argc, argv, "debs")) != EOF)
+	while ((option_char = getopt(argc, argv, "debls")) != EOF)
 	{
 		switch (option_char)
 		{
+		case 'g':
+			g_flag = 1;
+			break;
 		case 'd':
 			d_flag = 1;
 			break;
@@ -32,11 +35,15 @@ int main(int argc, char* argv[])
 		case 'b':
 			b_flag = 1;
 			break;
+		case 'l':
+			l_flag = 1;
+			break;
 		case 's':
 			s_flag = 1;
 			break;
 		default:
-			fprintf (stderr, "usage: %s [debsk]\n", argv[0]);
+			fprintf (stderr,
+					"usage: %s [gdeblsk]\n\tg - get last ckp\n\td - drop db\n\te - insert example rows\n\tb - run basic\n\tl - list db\n\ts run schema meta\n", argv[0]);
 		}
 	}
 
@@ -44,7 +51,19 @@ int main(int argc, char* argv[])
 
 	if(connector.connect())
 	{
-		if(d_flag)
+		if(g_flag)
+		{
+			std::string tmp_last_ckp;
+			std::string m_dist_name = "wc1";
+			bool is_found_last_ckp = false;
+
+			is_found_last_ckp = connector.get_last_ckp(m_dist_name, tmp_last_ckp);
+			if (is_found_last_ckp)
+				std::cout << "I've found an old checkpoint to recover! id: `" << tmp_last_ckp << "`" << std::endl;
+			else
+				std::cout << "NOT found an old checkpoint to recover!" << std::endl;
+		}
+		else if(d_flag)
 		{
 			connector.drop_db();
 		}
@@ -68,6 +87,11 @@ int main(int argc, char* argv[])
 		{
 			Basic b;
 			b.run();
+		}
+		else if(l_flag)
+		{
+			connector.list_data_ckps();
+			connector.list_last_ckps();
 		}
 		else if(s_flag)
 		{

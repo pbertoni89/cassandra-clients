@@ -2,12 +2,14 @@
 #define CASSANDRA_CONNECTOR_HPP
 #include <cassandra.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <iostream>
 #include <sstream>
 #include <vector>
 #include <string>
 #define CASSANDRA_CONNECTOR_NAME "CassandraConnector: "
-
+/* 1 MegaByte of information can be transmitted over a single connection. */
+#define CASSANDRA_CLUSTER_HIGH_WATERMARK 1048576
 
 const std::string keyspace_name = "blockmon";
 const std::string table_data_ckps_name = "table_data_ckps";
@@ -30,6 +32,8 @@ protected:
 	CassFuture* m_disconnect_future;
 	CassCluster* m_cluster;
 	CassSession* m_session;
+	/** Useful safeguard for improper calls. */
+	bool m_is_connected;
 
 	//static int BUFFER_BYTE_SIZE = 102400;
 	//BYTES_NEEDED = 128;
@@ -56,8 +60,6 @@ protected:
 	 */
 	void create_tables();
 
-	/** @return the last_ckp_id contained into table of last_ckps, having the given dist_name */
-	std::string get_last_ckp_id(std::string dist_name);
 	/** Sets last_ckp_id of dist_name, into table of last_ckps */
 	CassError set_last_ckp_id(std::string dist_name, std::string ckp_id);
 	/** Inner encapsulation. E.G.
@@ -67,6 +69,8 @@ protected:
 
 	/* inner encapsulation */
 	CassError _execute_query(CassStatement* statement);
+
+	CassError execute_query(const char* query);
 
 public:
 
@@ -94,7 +98,7 @@ public:
 	void recreate_db();
 	/** Drop keyspace and tables */
 	void drop_db();
-
-	CassError execute_query(const char* query);
+	/** Retrieve the last_ckp saved for the given dist_name. */
+	bool get_last_ckp(std::string dist_name, std::string &last_ckp_id);
 };
 #endif

@@ -6,6 +6,7 @@ CassandraConnector::CassandraConnector()
 	m_disconnect_future = NULL;
 	m_cluster = cass_cluster_new();
 	m_session = cass_session_new();
+	m_is_connected = false;
 }
 
 CassandraConnector::~CassandraConnector()
@@ -44,12 +45,18 @@ bool CassandraConnector::connect()
 	cass_cluster_set_contact_points(m_cluster, "127.0.0.1");
 	/* Provide the cluster object as configuration to connect the session */
 	m_connect_future = cass_session_connect(m_session, m_cluster);
+	/* Increase the maximum bunch of data that can be transmitted on a single connection. This because states often excees the default 64KB value */
+	cass_cluster_set_write_bytes_high_water_mark(m_cluster, (unsigned)CASSANDRA_CLUSTER_HIGH_WATERMARK);
 
 	/* This operation will block until the result is ready */
 	if (cass_future_error_code(m_connect_future) != CASS_OK)
 	{
 		print_error(m_connect_future);
 		is_connected = false;
+	}
+	else
+	{
+		m_is_connected = true;
 	}
 	return is_connected;
 }
@@ -164,22 +171,20 @@ void CassandraConnector::print_error(CassFuture* future)
 bool CassandraConnector::save_state(std::string node_id, std::string dist_name, std::string comp_name, std::string ckp_id,
 									std::vector<unsigned char>* state)
 {
-	return 	(_save_state(node_id, dist_name, comp_name, ckp_id, state) == CASS_OK)
-			&&
-			(set_last_ckp_id(dist_name, ckp_id) == CASS_OK);
+	if (m_is_connected)
+		return 	(_save_state(node_id, dist_name, comp_name, ckp_id, state) == CASS_OK)
+				&&
+				(set_last_ckp_id(dist_name, ckp_id) == CASS_OK);
+	else
+		return false;
 }
 
 bool CassandraConnector::recover_state(	std::string node_id, std::string dist_name, std::string comp_name ,std::string ckp_id,
 										char** state, long long int& size)
 {
-	std::cout << CASSANDRA_CONNECTOR_NAME << "Implement me. I'm recover_state()" << std::endl;
+	if (m_is_connected)
+		std::cout << CASSANDRA_CONNECTOR_NAME << "Implement me. I'm recover_state()" << std::endl;
 	return false;
-}
-
-std::string get_last_ckp_id()
-{
-	std::cout << CASSANDRA_CONNECTOR_NAME << "Implement me. I'm get_last_ckp_id()" << std::endl;
-	return "null";
 }
 
 CassError CassandraConnector::set_last_ckp_id(std::string dist_name, std::string ckp_id)
@@ -199,17 +204,15 @@ CassError CassandraConnector::_save_state(std::string node_id, std::string dist_
 {
 	std::stringstream query;
 	query << "INSERT INTO " << data_ckps_canonical_name << " (node_id, dist_name, comp_name, ckp_id, state) VALUES (?, ?, ?, ?, ?);";
-
-	std::string* prova = new std::string("araberara");
+	std::string _state = std::string(state->begin(), state->end());
 
 	CassStatement* statement = cass_statement_new(query.str().c_str(), 5);
 	cass_statement_bind_string(statement, 0, node_id.c_str());
 	cass_statement_bind_string(statement, 1, dist_name.c_str());
 	cass_statement_bind_string(statement, 2, comp_name.c_str());
 	cass_statement_bind_string(statement, 3, ckp_id.c_str());
-	cass_statement_bind_string(statement, 4, prova->c_str());
+	cass_statement_bind_string(statement, 4, _state.c_str());
 
-	delete(prova);
 	return _execute_query(statement);
 }
 
@@ -238,7 +241,7 @@ void CassandraConnector::list_data_ckps()
 		const CassResult* result = cass_future_get_result(future);
 		CassIterator* iterator = cass_iterator_from_result(result);
 
-		printf("\n%-5s\t%-20s\t%-20s\t%-10s\t%-20s\n", "node_id", "dist_name", "comp_name", "ckp_id", "state");
+		printf("\n%-5s\t%-30s\t%-30s\t%-10s\t%-10s\n", "node_id", "dist_name", "comp_name", "ckp_id", "state");
 
 		while(cass_iterator_next(iterator))
 		{
@@ -249,8 +252,10 @@ void CassandraConnector::list_data_ckps()
 			cass_value_get_string(cass_row_get_column(row, 2), &comp_name, &len_comp_name);
 			cass_value_get_string(cass_row_get_column(row, 3), &ckp_id, &len_ckp_id);
 			cass_value_get_string(cass_row_get_column(row, 4), &state, &len_state);
-			//printf("%.*s\n", (int)len_node_id, node_id);
-			printf("%-5s\t%-20s\t%-20s\t%-10s\t%-20s\n", node_id, dist_name, comp_name, ckp_id, state);
+			char state_descr[10];
+			sprintf(state_descr, "%d", (int)len_state);
+			//printf("STATE %s\n", state);
+			printf("%-5s\t%-30s\t%-30s\t%-10s\t%-10s\n", node_id, dist_name, comp_name, ckp_id, state_descr);
 		}
 		printf("\n");
 		cass_result_free(result);
@@ -285,7 +290,7 @@ void CassandraConnector::list_last_ckps()
 		const CassResult* result = cass_future_get_result(future);
 		CassIterator* iterator = cass_iterator_from_result(result);
 
-		printf("\n%-20s\t%-10s\n", "dist_name", "ckp_id");
+		printf("\n%-30s\t%-10s\n", "dist_name", "ckp_id");
 
 		while(cass_iterator_next(iterator))
 		{
@@ -293,8 +298,7 @@ void CassandraConnector::list_last_ckps()
 
 			cass_value_get_string(cass_row_get_column(row, 0), &dist_name, &len_dist_name);
 			cass_value_get_string(cass_row_get_column(row, 1), &last_ckp_id, &len_last_ckp_id);
-			//printf("%.*s\n", (int)len_node_id, node_id);
-			printf("%-20s\t%-10s\n", dist_name, last_ckp_id);
+			printf("%-30s\t%-10s\n", dist_name, last_ckp_id);
 		}
 		printf("\n");
 		cass_result_free(result);
@@ -302,4 +306,51 @@ void CassandraConnector::list_last_ckps()
 	}
 	cass_future_free(future);
 	cass_statement_free(statement);
+}
+
+bool CassandraConnector::get_last_ckp(std::string dist_name, std::string &last_ckp_id)
+{
+	CassError rc = CASS_OK;
+	CassStatement* statement = NULL;
+	CassFuture* future = NULL;
+	std::stringstream query;
+	query << "SELECT * FROM " << last_ckps_canonical_name << " WHERE dist_name = " << dist_name;
+	std::cout << CASSANDRA_CONNECTOR_NAME << "Query is " << query.str() << std::endl;
+	bool is_found = false;
+
+	statement = cass_statement_new(query.str().c_str(), 0);
+	future = cass_session_execute(m_session, statement);
+	cass_future_wait(future);
+
+	const char * last_ckp_buffer;
+	size_t len_last_ckp_id;
+
+	rc = cass_future_error_code(future);
+	if (rc != CASS_OK)
+	{
+		print_error(future);
+	}
+	else
+	{
+		const CassResult* result = cass_future_get_result(future);
+		CassIterator* iterator = cass_iterator_from_result(result);
+
+		if(cass_iterator_next(iterator))
+		{
+			const CassRow* row = cass_iterator_get_row(iterator);
+			cass_value_get_string(cass_row_get_column(row, 1), &last_ckp_buffer, &len_last_ckp_id);
+			last_ckp_id = std::string(last_ckp_buffer);
+			is_found = true;
+			std::cout << CASSANDRA_CONNECTOR_NAME << "YES checkpoint `" << last_ckp_id << "` found for dist_name = " << dist_name << std::endl;
+		}
+		else
+		{
+			std::cout << CASSANDRA_CONNECTOR_NAME << "NO checkpoint found for dist_name = " << dist_name << ". WHAT should I do ?" << std::endl;
+		}
+		cass_result_free(result);
+		cass_iterator_free(iterator);
+	}
+	cass_future_free(future);
+	cass_statement_free(statement);
+	return is_found;
 }
