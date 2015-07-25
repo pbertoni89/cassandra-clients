@@ -78,7 +78,7 @@ void CassandraConnector::recreate_db()
 
 void CassandraConnector::create_db()
 {
-	create_keyspace();
+	set_keyspace();
 	create_tables();
 }
 
@@ -90,7 +90,7 @@ void CassandraConnector::drop_db()
 	std::cout << CASSANDRA_CONNECTOR_NAME << "Cassandra DB has been cleaned." << std::endl;
 }
 
-void CassandraConnector::create_keyspace()
+void CassandraConnector::set_keyspace()
 {
 	std::cout << CASSANDRA_CONNECTOR_NAME << "creating new keyspace `" + keyspace_name + "`" << std::endl;
 	std::stringstream query_create;
@@ -174,7 +174,7 @@ bool CassandraConnector::save_state(std::string node_id, std::string dist_name, 
 	if (m_is_connected)
 		return 	(_save_state(node_id, dist_name, comp_name, ckp_id, state) == CASS_OK)
 				&&
-				(set_last_ckp_id(dist_name, ckp_id) == CASS_OK);
+				(set_last_ckp(dist_name, ckp_id) == CASS_OK);
 	else
 		return false;
 }
@@ -187,7 +187,7 @@ bool CassandraConnector::recover_state(	std::string node_id, std::string dist_na
 	return false;
 }
 
-CassError CassandraConnector::set_last_ckp_id(std::string dist_name, std::string ckp_id)
+CassError CassandraConnector::set_last_ckp(std::string dist_name, std::string ckp_id)
 {
 	std::stringstream query;
 	query << "INSERT INTO " << last_ckps_canonical_name << " (dist_name, last_ckp_id) VALUES (?, ?);";
@@ -314,7 +314,7 @@ bool CassandraConnector::get_last_ckp(std::string dist_name, std::string &last_c
 	CassStatement* statement = NULL;
 	CassFuture* future = NULL;
 	std::stringstream query;
-	query << "SELECT * FROM " << last_ckps_canonical_name << " WHERE dist_name = " << dist_name;
+	query << "SELECT * FROM " << last_ckps_canonical_name << " WHERE dist_name = '" << dist_name << "'";
 	std::cout << CASSANDRA_CONNECTOR_NAME << "Query is " << query.str() << std::endl;
 	bool is_found = false;
 

@@ -19,7 +19,7 @@ int main(int argc, char* argv[])
 	int option_char;
 	int g_flag = 0, d_flag = 0, e_flag = 0, b_flag = 0, l_flag = 0, s_flag = 0;
 
-	while ((option_char = getopt(argc, argv, "debls")) != EOF)
+	while ((option_char = getopt(argc, argv, "gdebls")) != EOF)
 	{
 		switch (option_char)
 		{
@@ -43,7 +43,7 @@ int main(int argc, char* argv[])
 			break;
 		default:
 			fprintf (stderr,
-					"usage: %s [gdeblsk]\n\tg - get last ckp\n\td - drop db\n\te - insert example rows\n\tb - run basic\n\tl - list db\n\ts run schema meta\n", argv[0]);
+					"usage: %s [gdebls]\n\tg - get last ckp\n\td - drop db\n\te - insert example rows\n\tb - run basic\n\tl - list db\n\ts run schema meta\n", argv[0]);
 		}
 	}
 

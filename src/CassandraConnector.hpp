@@ -48,7 +48,7 @@ protected:
 
 		USE blockmon;
 	 */
-	void create_keyspace();
+	void set_keyspace();
 	/**
 	 	CREATE TABLE blockmon.table_data_ckps (
 	 	node_id text, dist_name text, comp_name text, ckp_id text, state text,
@@ -61,7 +61,7 @@ protected:
 	void create_tables();
 
 	/** Sets last_ckp_id of dist_name, into table of last_ckps */
-	CassError set_last_ckp_id(std::string dist_name, std::string ckp_id);
+	CassError set_last_ckp(std::string dist_name, std::string ckp_id);
 	/** Inner encapsulation. E.G.
 	 	 INSERT INTO blockmon.table_data_ckps (node_id, dist_name, comp_name, ckp_id, state) VALUES ('1', 'wc1', 'src', 'ABCD', 'provaa');
 	 */
