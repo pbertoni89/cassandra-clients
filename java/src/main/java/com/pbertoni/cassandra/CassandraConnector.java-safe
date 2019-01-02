@@ -1,0 +1,221 @@
+package com.pbertoni.cassandra;
+
+import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.Metadata;
+import com.datastax.driver.core.ResultSet;
+import com.datastax.driver.core.Row;
+import com.datastax.driver.core.Session;
+import com.datastax.driver.core.BoundStatement;
+import com.datastax.driver.core.PreparedStatement;
+
+import java.io.*;
+import java.net.*;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+
+public class CassandraConnector {
+   private Session session;
+   private String applicationName = "ProvaApplicationName";
+   private String checkpointId = "ProvaCheckpointId";
+   private String compositionName = "ProvaCompositionName";
+
+   public CassandraConnector() {
+   }
+
+   /**
+    * Connects to the specified node.
+    * @param node a host name or IP address of the node in the cluster
+    */
+   public void connect(String node) {
+      Cluster cluster = Cluster.builder()
+            .addContactPoint(node)
+            // .withSSL() // uncomment if using client to node encryption
+            .build();
+      Metadata metadata = cluster.getMetadata();
+      System.out.printf("Connected to cluster: %s\n", 
+            metadata.getClusterName());
+      session = cluster.connect();
+   }
+   
+   /**
+    * Loads some data into the schema so that we can query the tables.
+    */
+   public void loadData(byte[] state, int size) {
+      // insert data in the tables
+      PreparedStatement prep = session.prepare("insert into blockmon.checkpointed_states_new (application_name, state, checkpoint_id, composition_name) values ('" 
+	+ applicationName + "', ?, '" + checkpointId + "', '" + compositionName + "');");
+
+
+      //String str = "Pippozzo";
+      //byte[] provaState = str.getBytes();
+      //ByteBuffer buf = ByteBuffer.wrap(provaState);
+      for(int i = 0; i < size; i++){
+	      System.out.printf("%02X", state[i]);
+      }
+      System.out.println("\n");
+      System.out.println("Size of the state: " + size);
+
+      ByteBuffer buf = ByteBuffer.wrap(state,0,size);
+ 
+      session.execute(prep.bind(buf));
+      System.out.println("Data loaded.");
+   }
+   
+   /**
+    * Queries the songs and playlists tables for data.
+    */
+   public void querySchema() {
+      ResultSet results = session.execute(
+            "SELECT * FROM simplex.playlists " +
+            "WHERE id = 2cc9ccb7-6221-4ccb-8387-f22b6a1b354d;");
+      System.out.println(String.format("%-30s\t%-20s\t%-20s\n%s", "title", "album", "artist",
+            "-------------------------------+-----------------------+--------------------"));
+      for (Row row : results) {
+         System.out.println(String.format("%-30s\t%-20s\t%-20s", row.getString("title"),
+               row.getString("album"),  row.getString("artist")));
+      }
+      System.out.println();
+   }
+   
+   /**
+    * Updates the songs table with a new song and then queries the table
+    * to retrieve data.
+    */
+   public void updateSchema() {
+      session.execute(
+            "UPDATE simplex.songs " +
+            "SET tags = tags + { 'entre-deux-guerres' } " +
+            "WHERE id = 756716f7-2e54-4715-9f00-91dcbea6cf50;");
+      
+      ResultSet results = session.execute(
+            "SELECT * FROM simplex.songs " +
+            "WHERE id = 756716f7-2e54-4715-9f00-91dcbea6cf50;");
+      
+      System.out.println(String.format("%-30s\t%-20s\t%-20s%-30s\n%s", "title", "album", "artist",
+            "tags", "-------------------------------+-----------------------+--------------------+-------------------------------"));
+      for (Row row : results) {
+         System.out.println(String.format("%-30s\t%-20s\t%-20s", row.getString("title"),
+               row.getString("album"),  row.getString("artist"), row.getSet("tags", String.class)));
+      }
+   }
+
+
+   /**
+    * Returns the current session.
+    * @return the current session to execute statements on
+    */
+   public Session getSession() {
+      return this.session;
+   }
+   
+   // used by the workaround method in the BoundStatementsclient child class.
+   void setSession(Session session) {
+   	this.session = session;
+   }
+
+   /**
+    * Shuts down the session and its cluster.
+    */
+   public void close() {
+      session.shutdown();
+      session.getCluster().shutdown();
+   }
+   
+   public int receiveOnSocket(byte[] bytebuffer){
+	int toread = 0;
+
+	    ServerSocket sockAccept;
+            Socket sockConn;
+            InputStream is = null;
+            OutputStream os = null;
+	try{
+	    	sockAccept = new ServerSocket(4444);
+
+        	//byte[] bytebuffer = new byte[102400];
+
+		try {
+		    System.out.println ("Waiting for Client");
+		    sockConn = sockAccept.accept();
+		    is = sockConn.getInputStream();
+		    os = sockConn.getOutputStream();
+
+		    try {
+			// read first number of bytes to transfer
+			int needed = 4;
+			while (true) {
+			    int read = is.read(bytebuffer, 4 - needed, needed);
+			    needed = needed - read;
+			    if(needed == 0)
+				break;
+			}
+
+			//int toread = (bytebuffer[0]) & 0xFF;
+			toread = (bytebuffer[0]) & 0xFF;
+			toread = toread << 8 | (bytebuffer[1] & 0xFF);
+			toread = toread << 8 | (bytebuffer[2] & 0xFF);
+			toread = toread << 8 | (bytebuffer[3] & 0xFF);
+
+			if(toread > 102400) {
+			    System.out.println("Sequence too long");
+			    System.exit(1);
+			}
+
+			needed = toread;
+			int offset = 0;
+
+			while(needed > 0) {
+			    int read = is.read(bytebuffer, offset, needed);
+			    needed = needed - read;
+			    offset = offset + read;
+			}
+			
+			byte[] retVal = new byte[1];
+			retVal[0] = '1';
+
+			os.write(retVal, 0, 1);
+
+			System.out.println("done");
+		    } finally {
+			is.close();
+			sockConn.close();
+			sockAccept.close();
+		    }
+		} catch (IOException e) {
+		    System.err.println("Accept failed.");
+		    System.exit(1);
+
+		}
+
+        }catch (IOException e) {
+            System.err.println("Accept failed.");
+            System.exit(1);
+
+        }
+
+	return toread;
+    }
+	
+
+   /**
+    * Creates  simple client application that illustrates connecting to
+    * a Cassandra cluster. retrieving metadata, creating a schema,
+    * loading data into it, and then querying it.
+    * @param args ignored
+    */
+   public static void main(String[] args) {
+     while(true){ 
+      byte[] byteState = new byte[102400];
+	
+
+      CassandraConnector client = new CassandraConnector();
+      
+      int length = client.receiveOnSocket(byteState);
+      System.out.println("Ricevuto stato di dimensione" + length);
+      
+      client.connect("192.168.0.46");
+      client.loadData(byteState, length);
+      client.close();
+    }
+   }
+
+}

@@ -1,0 +1,8 @@
+/usr/lib/jvm/java-7-openjdk-amd64/
+/usr/lib/jvm/java-7-openjdk-amd64/:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/jvm/java-7-openjdk-amd64//bin
+mvn -f pom.xml exec:java -Dexec.mainClass=com.pbertoni.cassandra.SimpleClient
+mvn -f pom.xml exec:java -Dexec.mainClass=com.pbertoni.cassandra.CassandraConnector
+
+
+
+Attualmente (Patrizio) il client si connette a 192.168.0.50, che è computer50 !!!!
